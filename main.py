@@ -222,7 +222,7 @@ with tabs[0]:
             pix_to_meter = st.number_input(
                 "Pixel-to-meter conversion rate:",
                 min_value=0.0,
-                value=0.01,
+                value=200.00,
                 format="%.4f"
             )
         
@@ -261,8 +261,13 @@ with tabs[0]:
                         detections = sliding_window_detection(processed_img, model)
                         final_detections = non_max_suppression(detections, overlap_thresh=0.4)
 
+                
+                        result_img = st.session_state.original_image.copy()
+
                         # Process results
                         bounding_box_data = []
+                        box_coordinates = []  # List to store box coordinates
+
                         result_img = st.session_state.original_image.copy()
 
                         # Sort detections by area
@@ -273,35 +278,48 @@ with tabs[0]:
                                 area_pixels = (x2 - x1) * (y2 - y1)
                                 if area_pixels > 600:
                                     valid_detections.append((det, area_pixels))
-                        
+
                         valid_detections.sort(key=lambda x: x[1], reverse=True)
 
-                        # Draw detections
+                        # Draw detections and save coordinates
                         for idx, (det, area_pixels) in enumerate(valid_detections, 1):
                             x1, y1, x2, y2, conf, cls_id = det
-                            area_meters = area_pixels * (pix_to_meter ** 2)
+                            area_kms = (area_pixels * (pix_to_meter ** 2))/1000000
                             
+                            # Save coordinates and additional details
+                     
                             bounding_box_data.append({
-                                "Detection #": idx,
+                                "Detection ID": idx,
                                 "Confidence": conf,
                                 "Area (px²)": area_pixels,
-                                "Area (m²)": area_meters
+                                "Area (km²)": area_kms,
+                                "x1": x1,
+                                "y1": y1,
+                                "x2": x2,
+                                "y2": y2
                             })
+
+
                             
+            
+                            # Draw the bounding box on the image
                             x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
                             cv2.rectangle(result_img, (x1, y1), (x2, y2), (255, 255, 204), 2)
-                            label = f"#{idx} ({conf:.2f}), Area: {area_meters:.2f} m²"
+                            label = f"#{idx} ({conf:.2f}), Area: {area_kms:.2f} km²"
                             cv2.putText(result_img, label, (x1, y1 - 10),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (250, 250, 250), 2)
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (250, 250, 250), 2)
 
-                        # Convert and store results
+                        # Convert box coordinates to a DataFrame
+                        df_boxes = pd.DataFrame(bounding_box_data) if bounding_box_data else None
+                        df_coordinates = pd.DataFrame(box_coordinates) if box_coordinates else None
                         result_img_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
                         result_bytes = BytesIO()
                         Image.fromarray(result_img_rgb).save(result_bytes, format='PNG')
-                        
+                        # Store results in session state
                         st.session_state.processed_result = {
                             'result_img': result_img_rgb,
-                            'df_boxes': pd.DataFrame(bounding_box_data) if bounding_box_data else None,
+                            'df_boxes': df_boxes,
+                            'df_coordinates': df_coordinates,
                             'result_bytes': result_bytes.getvalue()
                         }
                         
@@ -335,22 +353,24 @@ with tabs[1]:
                     mime="image/png"
                 )
             with col_b:
-                if st.session_state.processed_result['df_boxes'] is not None:
-                    st.download_button(
-                        "📥 Download Detection Data",
-                        data=st.session_state.processed_result['df_boxes'].to_csv(index=False).encode('utf-8'),
-                        file_name="detections.csv",
-                        mime="text/csv"
-                    )
-        
+                with col_b:
+                   st.download_button(
+                    "📥 Download Detection Data",
+                    data=st.session_state.processed_result['df_boxes'][["Detection ID", "Confidence", "Area (px²)", "Area (km²)", "x1", "y1", "x2", "y2"]].to_csv(index=False).encode('utf-8'),
+                    file_name="detections.csv",
+                    mime="text/csv"
+                )
+
+
         with col2:
             st.subheader("Detection Details")
             if st.session_state.processed_result['df_boxes'] is not None:
                 st.dataframe(
-                    st.session_state.processed_result['df_boxes'],
-                    use_container_width=True,
-                    hide_index=True
-                )
+                st.session_state.processed_result['df_boxes'][["Detection ID", "Confidence", "Area (px²)", "Area (km²)", "x1", "y1", "x2", "y2"]],
+                use_container_width=True,
+                hide_index=True
+    )
+
                 
                 # Statistics
                 st.markdown("### Summary Statistics")
@@ -360,8 +380,8 @@ with tabs[1]:
                     st.metric("Total Detections", len(df))
                     st.metric("Avg Confidence", f"{df['Confidence'].mean():.2%}")
                 with stats_col2:
-                    st.metric("Total Area (m²)", f"{df['Area (m²)'].sum():.2f}")
-                    st.metric("Avg Area (m²)", f"{df['Area (m²)'].mean():.2f}")
+                    st.metric("Total Area (km²)", f"{df['Area (km²)'].sum():.2f}")
+                    st.metric("Avg Area (km²)", f"{df['Area (km²)'].mean():.2f}")
             else:
                 st.info("No detections found in the image.")
     else:
