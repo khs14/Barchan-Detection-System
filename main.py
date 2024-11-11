@@ -6,7 +6,6 @@ from ultralytics import YOLO
 from io import BytesIO
 from scipy import ndimage
 from PIL import Image
-import tempfile
 
 # Define the image preprocessing class
 class ImagePreprocessor:
@@ -193,7 +192,7 @@ def load_model():
 model = load_model()
 
 # Header Section
-st.title("🎯 Barchan Detection System")
+st.title("🏜️ Barchan Detection System")
 st.markdown("---")
 
 # Main Layout
@@ -213,7 +212,7 @@ with tabs[0]:
             if uploaded_file:
                 image = Image.open(uploaded_file)
                 st.session_state.original_image = np.array(image)
-                st.image(image, caption="Original Image", use_column_width=True)
+                st.image(image, caption="Original Image", use_container_width=True)
     
     with col2:
         st.markdown('<div class="settings-card">', unsafe_allow_html=True)
@@ -324,7 +323,7 @@ with tabs[1]:
             st.subheader("Detection Visualization")
             st.image(st.session_state.processed_result['result_img'], 
                     caption="Detection Result",
-                    use_column_width=True)
+                    use_container_width=True)
             
             # Download buttons
             col_a, col_b = st.columns(2)
