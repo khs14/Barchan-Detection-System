@@ -1,5 +1,5 @@
 streamlit
-opencv-python-headless==4.7.1.72
+opencv-python-headless
 numpy
 pandas
 ultralytics==8.0.58
